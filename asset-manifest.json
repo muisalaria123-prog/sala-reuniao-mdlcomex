@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/sala-reuniao-mdlcomex/static/css/main.36a85cf6.css",
-    "main.js": "/sala-reuniao-mdlcomex/static/js/main.339d4e3d.js",
+    "main.js": "/sala-reuniao-mdlcomex/static/js/main.a09a83f0.js",
     "index.html": "/sala-reuniao-mdlcomex/index.html",
     "main.36a85cf6.css.map": "/sala-reuniao-mdlcomex/static/css/main.36a85cf6.css.map",
-    "main.339d4e3d.js.map": "/sala-reuniao-mdlcomex/static/js/main.339d4e3d.js.map"
+    "main.a09a83f0.js.map": "/sala-reuniao-mdlcomex/static/js/main.a09a83f0.js.map"
   },
   "entrypoints": [
     "static/css/main.36a85cf6.css",
-    "static/js/main.339d4e3d.js"
+    "static/js/main.a09a83f0.js"
   ]
 }
