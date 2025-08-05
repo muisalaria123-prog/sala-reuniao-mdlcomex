@@ -1,17 +1,18 @@
-/* global __app_id, __firebase_config, __initial_auth_token */
-
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, query, onSnapshot, addDoc, where, getDocs } from 'firebase/firestore';
 import { create } from 'zustand';
 
-// O aplicativo MDL Comex para agendamento de salas de reunião
 // Este aplicativo é um exemplo completo e funcional com duas telas:
 // uma página inicial e uma página de agendamento.
 // Ele utiliza o React para a interface do usuário e o Firestore para
 // gerenciar os agendamentos de forma persistente e em tempo real.
 // A interface é construída com Tailwind CSS para um design moderno e responsivo.
+
+// DECLARAÇÃO DO appId FORA DOS COMPONENTES, AGORA ACEDENDO O OBJETO GLOBAL 'window'
+// Aceder 'window.__app_id' explicitamente ajuda a resolver o erro 'no-undef' do linter.
+const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
 
 // ZUSTAND: Gerenciamento de estado global.
 // Usamos Zustand para gerenciar o estado da página (home/agendamento)
@@ -43,12 +44,11 @@ const generateTimeSlots = () => {
 const HomePage = ({ onNavigate }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 bg-cover bg-center"
-      // COMENTÁRIO: Substitua o 'bg-gray-900' e a URL abaixo pela sua imagem de fundo.
-      // style={{ backgroundImage: "url('URL_DA_SUA_IMAGEM')" }}
-      >
+      style={{ backgroundImage: "url('https://placehold.co/1920x1080/0d133b/a9c1e1?text=MDL+COMEX')" }}
+    >
       {/* Cabeçalho */}
       <div className="absolute top-0 left-0 w-full p-6 text-center bg-[#004aad] shadow-lg">
-        <h1 className="text-4xl font-bold text-[#ffffff]" style={{ fontFamily: 'Bodoni MT' }}>
+        <h1 className="text-4xl font-bold text-[#ffffff] animate-fade-in" style={{ fontFamily: 'Bodoni MT' }}>
           Sala de Reunião MDL COMEX
         </h1>
       </div>
@@ -57,7 +57,7 @@ const HomePage = ({ onNavigate }) => {
       <div className="flex-grow flex items-center justify-center">
         <button
           onClick={onNavigate}
-          className="bg-[#004aad] text-[#ffc300] font-bold py-4 px-8 rounded-full shadow-lg hover:bg-blue-800 transition duration-300 transform hover:scale-105 text-xl"
+          className="bg-gradient-to-r from-[#004aad] to-[#003387] text-[#ffc300] font-bold py-4 px-8 rounded-full shadow-2xl hover:scale-105 transition-all duration-300 transform text-xl"
           style={{ fontFamily: 'Bodoni MT' }}
         >
           agende aqui
@@ -69,7 +69,8 @@ const HomePage = ({ onNavigate }) => {
 
 // COMPONENTE DA PÁGINA DE AGENDAMENTO
 // A página principal para gerenciar os agendamentos.
-const BookingPage = ({ db, userId }) => {
+const BookingPage = ({ db, userId, appId }) => {
+  const { setCurrentPage } = useStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedRoom, setSelectedRoom] = useState('Sala de Reunião 2º andar');
   const [userName, setUserName] = useState('');
@@ -77,17 +78,13 @@ const BookingPage = ({ db, userId }) => {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  // NOVOS ESTADOS PARA A FUNCIONALIDADE GEMINI API
   const [agenda, setAgenda] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const timeSlots = generateTimeSlots();
 
   // EFETOR PARA OUVIR ALTERAÇÕES NO FIRESTORE
-  // Usa `onSnapshot` para obter atualizações em tempo real dos agendamentos,
-  // garantindo que todos os usuários vejam os mesmos dados.
   useEffect(() => {
-    if (!db) return;
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    if (!db || !userId || !appId) return;
     const bookingsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'mdl_comex_bookings');
     const q = query(bookingsCollectionRef);
 
@@ -104,17 +101,16 @@ const BookingPage = ({ db, userId }) => {
     });
 
     return () => unsubscribe();
-  }, [db]);
+  }, [db, userId, appId]);
 
   // FUNÇÃO PARA SALVAR O AGENDAMENTO
-  // Esta função verifica a disponibilidade e salva o agendamento no Firestore.
   const handleSaveBooking = async (time) => {
     setErrorMessage('');
     setSuccessMessage('');
-    setAgenda(''); // Limpa a agenda ao fazer um novo agendamento
+    setAgenda('');
 
     if (!userName.trim()) {
-      setErrorMessage('Por favor, insira seu nome para agendar.');
+      setErrorMessage('Por favor, insira o seu nome para agendar.');
       return;
     }
 
@@ -124,10 +120,8 @@ const BookingPage = ({ db, userId }) => {
     }
 
     try {
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
       const bookingsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'mdl_comex_bookings');
 
-      // VERIFICA SE O HORÁRIO JÁ ESTÁ RESERVADO
       const q = query(
         bookingsCollectionRef,
         where('date', '==', selectedDate),
@@ -141,7 +135,6 @@ const BookingPage = ({ db, userId }) => {
         return;
       }
 
-      // SALVA O NOVO AGENDAMENTO
       await addDoc(bookingsCollectionRef, {
         userName: userName,
         date: selectedDate,
@@ -151,7 +144,7 @@ const BookingPage = ({ db, userId }) => {
       });
 
       setSuccessMessage('Agendamento salvo com sucesso!');
-      setUserName(''); // Limpa o nome após o agendamento
+      setUserName('');
     } catch (e) {
       console.error("Erro ao adicionar documento: ", e);
       setErrorMessage('Ocorreu um erro ao salvar o agendamento. Tente novamente.');
@@ -161,7 +154,7 @@ const BookingPage = ({ db, userId }) => {
   // FUNÇÃO GEMINI API - GERAR AGENDA DE REUNIÃO
   const handleGenerateAgenda = async () => {
     if (!userName.trim() || !selectedDate || !selectedRoom) {
-      setErrorMessage('Por favor, preencha seu nome, data e sala para gerar a agenda.');
+      setErrorMessage('Por favor, preencha o seu nome, data e sala para gerar a agenda.');
       return;
     }
 
@@ -179,7 +172,7 @@ const BookingPage = ({ db, userId }) => {
     const apiKey = "";
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
-    let backoff = 1000; // 1 second
+    let backoff = 1000;
     let response;
     let result;
 
@@ -230,17 +223,22 @@ const BookingPage = ({ db, userId }) => {
   // ESTILIZAÇÃO DO BOTÃO DE HORÁRIO
   const getTimeSlotClass = (time) => {
     const isBooked = isSlotBooked(selectedDate, time, selectedRoom);
-    return `px-4 py-2 rounded-lg transition-colors duration-200 ease-in-out
+    return `px-4 py-2 rounded-lg text-white transition-colors duration-200 ease-in-out
       ${isBooked
-        ? 'bg-red-400 text-white cursor-not-allowed'
-        : 'bg-green-500 hover:bg-green-600 text-white cursor-pointer'
+        ? 'bg-red-500 cursor-not-allowed'
+        : 'bg-green-600 hover:bg-green-700 cursor-pointer'
       }`;
   };
-
+  
   return (
-    <div className="min-h-screen bg-[#617bcb] font-sans text-gray-800 p-6 sm:p-8">
+    <div className="min-h-screen bg-[#f3f4f6] font-sans text-gray-800 p-6 sm:p-8">
+      {/* Botão de Voltar */}
+      <button onClick={() => setCurrentPage('home')} className="absolute top-4 left-4 text-[#004aad] hover:text-[#003387] text-3xl font-bold p-2 transition-colors duration-200">
+        &larr;
+      </button>
+
       {/* Cabeçalho da Página de Agendamento */}
-      <div className="w-full p-4 text-center bg-[#004aad] shadow-lg mb-8 rounded-lg">
+      <div className="w-full p-6 text-center bg-[#004aad] shadow-lg mb-8 rounded-xl">
         <h1 className="text-3xl sm:text-4xl font-bold text-[#ffffff]" style={{ fontFamily: 'Bodoni MT' }}>
           Sala de Reunião MDL COMEX
         </h1>
@@ -256,7 +254,7 @@ const BookingPage = ({ db, userId }) => {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"
             />
           </div>
 
@@ -267,7 +265,7 @@ const BookingPage = ({ db, userId }) => {
               id="room"
               value={selectedRoom}
               onChange={(e) => setSelectedRoom(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"
             >
               <option>Sala de Reunião 2º andar</option>
               <option>Sala de Reunião 8º andar</option>
@@ -276,33 +274,33 @@ const BookingPage = ({ db, userId }) => {
 
           {/* Nome da Pessoa */}
           <div className="w-full sm:w-1/3">
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">Seu Nome:</label>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700">O seu Nome:</label>
             <input
               id="name"
               type="text"
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
-              placeholder="Digite seu nome"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"
+              placeholder="Digite o seu nome"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2"
             />
           </div>
         </div>
 
         {/* Mensagens de feedback */}
         {errorMessage && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative transition-all duration-300 ease-in-out mt-4" role="alert">
             <span className="block sm:inline">{errorMessage}</span>
           </div>
         )}
         {successMessage && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg relative" role="alert">
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg relative transition-all duration-300 ease-in-out mt-4" role="alert">
             <span className="block sm:inline">{successMessage}</span>
           </div>
         )}
 
         {/* Grade de Horários */}
         <div>
-          <h3 className="text-xl font-semibold mb-4">Horários de Agendamento</h3>
+          <h3 className="text-xl font-semibold mb-4 text-[#004aad]">Horários de Agendamento</h3>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
             {timeSlots.map((time) => (
               <button
@@ -319,11 +317,11 @@ const BookingPage = ({ db, userId }) => {
 
         {/* NOVA SEÇÃO: GERADOR DE AGENDA COM GEMINI API */}
         <div className="mt-6 p-6 bg-blue-50 rounded-xl shadow-inner border-l-4 border-blue-400">
-          <h4 className="text-lg font-semibold text-blue-800 mb-2">Gerar uma agenda de reunião ✨</h4>
+          <h4 className="text-lg font-semibold text-[#004aad] mb-2">Gerar uma agenda de reunião ✨</h4>
           <button
             onClick={handleGenerateAgenda}
             disabled={isGenerating}
-            className="flex items-center justify-center bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="flex items-center justify-center bg-gradient-to-r from-[#004aad] to-[#003387] text-[#ffc300] font-bold py-2 px-4 rounded-lg hover:scale-105 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isGenerating ? (
               <>
@@ -338,7 +336,7 @@ const BookingPage = ({ db, userId }) => {
             )}
           </button>
           {agenda && (
-            <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+            <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200 shadow-md">
               <h5 className="font-semibold text-gray-800">Agenda da Reunião:</h5>
               <p className="mt-2 text-gray-600 whitespace-pre-wrap">{agenda}</p>
             </div>
@@ -349,16 +347,18 @@ const BookingPage = ({ db, userId }) => {
       {/* Seção de Agendamentos Existentes */}
       <div className="mt-8 max-w-4xl mx-auto">
         <div className="p-6 sm:p-8 bg-white rounded-2xl shadow-xl">
-          <h3 className="text-2xl font-bold mb-4">Agendamentos Existentes</h3>
+          <h3 className="text-2xl font-bold mb-4 text-[#004aad]">Agendamentos Existentes</h3>
           {loading ? (
-            <p className="text-gray-600">Carregando agendamentos...</p>
+            <div className="flex justify-center items-center h-20">
+              <div className="w-10 h-10 border-4 border-[#004aad] border-t-transparent rounded-full animate-spin"></div>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg shadow-inner">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-[#f0f4f8]">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Usuário
+                      Utilizador
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Data
@@ -373,7 +373,7 @@ const BookingPage = ({ db, userId }) => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {bookings.map((booking) => (
-                    <tr key={booking.id}>
+                    <tr key={booking.id} className="hover:bg-gray-50 transition-colors duration-150">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {booking.userName}
                       </td>
@@ -392,9 +392,9 @@ const BookingPage = ({ db, userId }) => {
               </table>
             </div>
           )}
-          {/* ID DO USUÁRIO - MANDATÓRIO PARA APLICATIVOS COLABORATIVOS */}
+          {/* ID DO UTILIZADOR - MANDATÓRIO PARA APLICATIVOS COLABORATIVOS */}
           <div className="mt-4 text-xs text-gray-500">
-              <span className="font-bold">Seu ID de usuário:</span> {userId}
+              <span className="font-bold">O seu ID de utilizador:</span> {userId}
           </div>
         </div>
       </div>
@@ -407,67 +407,65 @@ const BookingPage = ({ db, userId }) => {
 export default function App() {
   const { currentPage, setCurrentPage, setUserId } = useStore();
   const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [userId, setUserIdState] = useState(null); // Adicionado para rastrear o userId no componente App
 
+  // EFETOR PARA INICIALIZAR O FIREBASE E AUTENTICAÇÃO
   useEffect(() => {
-    // Inicialização do Firebase.
-    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-    if (!Object.keys(firebaseConfig).length) {
-      console.error("Firebase config não encontrado. O aplicativo não funcionará corretamente.");
-      return;
-    }
+    // Inicialização e autenticação do Firebase.
+    const initFirebase = async () => {
+      try {
+        // Credenciais do Firebase fornecidas pelo utilizador.
+        const firebaseConfig = {
+          apiKey: "AIzaSyBqmVLaJu4wwqOqJOIZHBfRLlbQB6AHSUE",
+          authDomain: "agendamento-de-salas-7b53a.firebaseapp.com",
+          projectId: "agendamento-de-salas-7b53a",
+          storageBucket: "agendamento-de-salas-7b53a.firebasestorage.app",
+          messagingSenderId: "624176787172",
+          appId: "1:624176787172:web:5e3a1558f58606617a46f1",
+          measurementId: "G-560Q10SCES"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const firestoreDb = getFirestore(app);
+        const firebaseAuth = getAuth(app);
+        setDb(firestoreDb);
 
-    const app = initializeApp(firebaseConfig);
-    const dbInstance = getFirestore(app);
-    const authInstance = getAuth(app);
-    setDb(dbInstance);
-    setAuth(authInstance);
+        // Usamos a autenticação anónima, pois não há necessidade de um token personalizado.
+        await signInAnonymously(firebaseAuth);
+        
+        onAuthStateChanged(firebaseAuth, (user) => {
+          if (user) {
+            setUserId(user.uid);
+          } else {
+            setUserId(null);
+          }
+          setIsAuthReady(true);
+        });
 
-    // Ouve as mudanças de autenticação para garantir que o usuário está logado.
-    const unsubscribe = onAuthStateChanged(authInstance, async (user) => {
-      if (!user) {
-        // Loga anonimamente se não houver usuário.
-        try {
-            await signInAnonymously(authInstance);
-        } catch (e) {
-            console.error("Erro ao fazer login anônimo:", e);
-        }
+      } catch (e) {
+        console.error("Erro ao inicializar Firebase:", e);
+        setIsAuthReady(false);
       }
-      setUserIdState(user?.uid || authInstance.currentUser?.uid || crypto.randomUUID());
-      setUserId(user?.uid || authInstance.currentUser?.uid || crypto.randomUUID());
-      setIsAuthReady(true);
-    });
-
-    // Tenta autenticar com o token personalizado, se existir.
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-    if (initialAuthToken) {
-        signInWithCustomToken(authInstance, initialAuthToken).catch(e => console.error("Erro ao fazer login com token personalizado:", e));
-    }
-
-    return () => unsubscribe();
+    };
+    initFirebase();
   }, [setUserId]);
 
-  if (!isAuthReady) {
+  const handleNavigateToBooking = () => {
+    setCurrentPage('booking');
+  };
+
+  if (!isAuthReady || !db) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <svg className="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="w-16 h-16 border-4 border-[#004aad] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      {currentPage === 'home' ? (
-        <HomePage onNavigate={() => setCurrentPage('booking')} />
-      ) : (
-        <BookingPage db={db} userId={userId} />
-      )}
-    </div>
+    <>
+      {currentPage === 'home' && <HomePage onNavigate={handleNavigateToBooking} />}
+      {currentPage === 'booking' && <BookingPage db={db} userId={useStore.getState().userId} appId={appId} />}
+    </>
   );
 }
-
